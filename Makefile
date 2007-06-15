@@ -4,7 +4,7 @@ CONFDIR = /etc/vzt
 MIBSDIR = /usr/share/snmp/mibs
 ###################################
 SCRIPTS = vzt-pductl vzt-kernel-install vzt-pxe-boot 
-CONFIGS = vzt-pductl.cfg vzt-pductl.cfg
+CONFIGS = vzt-pductl.cfg vzt-pxe-boot.cfg
 
 check:
 	@if [ ! -d "$(SNMP_MIBS_DIR)" ]; then \
