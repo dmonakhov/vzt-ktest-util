@@ -1,0 +1,18 @@
+#### Kernel target arch  ./boot/$ARCH 
+#ARCH=i386
+ARCH=x86_64
+
+#### PXE server settings
+PXE_SERVER=repo.qa.sw.ru
+PXE_ROOT=/tftpboot
+PXE_KERNEL_DIR=dmon/kernels
+PXE_CONFIG_DIR=pxelinux.cfg
+
+
+##  Boot options:
+##  if not defined than default options will be used
+
+#CONSOLE_OPTS="console=ttyS0,112500 "
+#ROOT_OPTS=" root=LABEL=/ "
+#MEM_OPTS=" mem=256M "
+BOOT_OPTS="$CONSOLE_OPTS $ROOT_OPTS $MEM_OPTS"

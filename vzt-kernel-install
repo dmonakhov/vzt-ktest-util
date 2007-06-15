@@ -1,12 +1,14 @@
 #!/bin/bash
 # Install kernel to test host
+CONFIG=.vzt/kernel-install.cfg
 function show_usage
 {
 	echo "$0: <host> [OPTS]"
 	echo "Usage:"
 	echo "Install kernele to test host via ssh or pxe"
 	echo "Examples:"
-	echo "Install kernel, modules and initrd to host via ssh and setup local boot loader"
+	echo "Install kernel, modules and initrd to host via \
+ssh and setup local boot loader"
 	echo "	$0 my_host.org --all"
 	echo "Install kernel only via ssh and setup local boot loader"
 	echo "	$0 my_host.org "
@@ -17,11 +19,14 @@ function show_usage
 	
 }	
 
-if [ ! -f ".vzt-kernel-install" ]; then
-	echo "Cant find .vzt-kern-install"
+if [ ! -f "$CONFIG" ]; then
+	echo "Cant find .vzt/kernel-install.cfg"
+	echo "you may use example config:"
+	echo "  mkdir .vzt; cp /etc/vzt/kernel-install.cfg.example \
+.vzt/kernel-install.cfg "
 	exit
 fi
-. .vzt-kernel-install
+. $CONFIG
 krel=`make kernelrelease`
 
 if [ ! $? -eq 0 ]; then
