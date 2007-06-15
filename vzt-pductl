@@ -1,0 +1,59 @@
+#! /bin/sh
+CONFIG="/etc/vzt/vzt-pductl.cfg"
+
+ACTION=$1
+shift
+PDU_HOST="$1"
+shift
+
+function show_usage
+{
+	echo "$0: pdu control tool"
+	echo "Usage: $0 <lsall/ls/reboot> <pdu_host> [options]"
+	echo "examples:"
+	echo "list all socket status on pdu00.qa"
+	echo "	$0 lsall pdu00.qa"
+	echo "get 15th socket power status on pdu00.qa"
+	echo "	$0 ls pdu00.qa 15"
+	echo "reboot 15th socket pdu00.qa"
+	echo "	$0 reboot pdu00.qa 15"
+
+
+
+}
+#######################################################################
+################### pdu speciffic functions section ###################
+
+##### PowerNet device 
+function power_net_mib
+{
+	pdu_host=$1
+	action=$2
+	host=$3
+	
+	case "$action" in
+	lsall	)	snmptable -c private -v 1 $pdu_host -m +PowerNet-MIB \
+			rPDUOutletStatusTable;;
+	ls	) 	snmpget -c private -v 1 -m +PowerNet-MIB $pdu_host \
+			rPDUOutletControlOutletCommand.$host;;
+	reboot	)	snmpset -c private -v 1 -m +PowerNet-MIB $pdu_host \
+			rPDUOutletControlOutletCommand.$host = immediateReboot;;
+	*	)	echo "Unknown action";
+			show_usage;
+		exit 1;;
+esac
+}
+
+
+
+CFG_FUNCTION=""
+while read name cfg_func  ;do
+	if [ "$name" == "$PDU_HOST" ];then
+		$cfg_func $PDU_HOST $ACTION  $@
+		exit 0
+		break
+	fi
+done < $CONFIG
+echo "Cant find $PDU_HOST in $CONFIG file"
+show_usage
+exit 1

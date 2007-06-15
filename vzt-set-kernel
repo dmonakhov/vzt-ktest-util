@@ -1,0 +1,26 @@
+#! /bin/sh 
+kernel_img=$1
+shift
+initrd_img=$1
+shift
+title_text=$1
+shift
+boot_opt=$@
+
+if [ ! -f /boot/${kernel_img} ]; then
+	echo "Kernel image : /boot/${kernel_img} not found"
+	exit 1
+fi 
+if [ ! -f /boot/${initrd_img} ]; then
+	echo "initrd image :/boot/${initrd_img} not found"
+	exit 1
+fi
+
+if [ -z "$boot_opt" ]; then
+	args="--copy-default"
+else
+	args='--args="$boot_opt"'
+fi
+grubby 	--remove-kernel=/boot/${kernel_img} --add-kernel=/boot/${kernel_img} \
+	--initrd=/boot/${initrd_img}  $args --title="${title_text}" --make-default 
+exit $?

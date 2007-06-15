@@ -1,0 +1,124 @@
+#! /bin/sh -x
+function show_usage
+{
+	echo "$0: <host> <set/del> [BOOT_OPTS]"
+}
+. /etc/vzt/vzt-pxe-boot.cfg
+EXIT_FAILURE=1
+EXIT_NOENT=2
+#PXE_KERNEL_DIR
+#PXE_CONFIG_DIR
+host=$1
+action=$2
+kernel_img=$3
+initrd_img=$4
+boot_opts=$5
+title_msg=$6
+
+ip=`gethostip $host | gawk '{ print \$1 }'` || exit 1
+hex_ip=`gethostip $host | gawk '{ print \$3 }'` || exit 1
+
+function change_pxe(){
+	local config="$1"
+	local fatal="$3"
+	PATT=$2
+	PATT="$(echo $PATT | sed -r 's/\//\\\//g')"
+	local default=$( cat $config | awk "{if (\$1 ~ /label/) point=\$2; if ((\$1 ~ /kernel/) && (\$2 ~ /$PATT/)) print point }")
+        
+	[ -n "$default" ] || {
+		if [ $fatal -ne 0 ]; then
+                	echo "No pattern found in $config"
+			exit $EXIT_NOENT
+		else
+			return $EXIT_NOENT
+		fi
+        }
+	echo $default
+        [ $(echo "$default" | wc -w) -eq 1 ] || {
+                echo "Pattern found several times in $config"
+                exit $EXIT_FAILURE
+        }
+
+        sed -i "s/default .*/default $default/" $config
+
+        return $?
+}
+
+function add_entry_pxe()
+{
+	local config=$1
+	local kernel_img="$2"
+	local kernel_opts="$3"
+	local initrd_img="$4"
+	local title_text="$5"
+	grep "label $title_text" $config
+	if [ $? -eq 0 ];then
+		echo "Err: label $title_text already present in: $config"
+		grep -n -A5 "label $title_text" $config
+		exit 1
+	fi
+	echo " "
+	echo "#$title_text"				>> $config
+	echo "label $title_text"			>> $config
+	echo "	kernel $kernel_img " 		   	>> $config
+	echo "	append initrd=$initrd_img $kernel_opts"	>> $config
+	return $?
+}
+
+function setup_pxe_config
+{
+	local conf="$1"
+	local kernel_img="$2"
+	local initrd_img="$3"
+	local kernel_opts="$4"
+	local title_text="$5"
+	local kpattern=$kernel_img
+
+	if [ ! -f $PXE_ROOT/$kernel_img ]; then
+		echo "kernel image: $PXE_ROOT/$kernel_img not found "
+		exit 1
+	fi
+	if [ ! -f $PXE_ROOT/$initrd_img ]; then
+		echo "initrd image: $PXE_ROOT/$initrd_img not found"
+		exit 1
+	fi
+
+	change_pxe $conf $kpattern 0
+	if [ $? -eq 2 ]; then
+		echo "try to add new entry: $ $kpattern"
+		add_entry_pxe $conf "$kernel_img" "$kernel_opts" "$initrd_img" "$title_text"
+		change_pxe $conf $kpattern 1 
+		if [ $? -eq 0 ]; then
+			grep default  $conf
+			echo " "
+			tail  $conf 
+			echo "****************************************"
+			echo "*** Kernel was successfully installed ***"
+			echo "****************************************"
+		else
+			echo "*** Error while add new entry ***"
+			echo "config:$conf may be corrupted, plese check it"
+			exit 1
+		fi
+	else 
+		grep default  $conf
+		echo "****************************************"
+		echo "*** Kernel was successfully selected ***"
+		echo "****************************************"
+	fi
+}	
+
+case "$action" in
+del	)	rm -rf $PXE_ROOT/$PXE_CONFIG_DIR/$hex_ip;;
+add	) 	if [ ! -f $PXE_ROOT/$PXE_CONFIG_DIR/$ip ];then 
+			echo "$PXE_ROOT/$PXE_CONFIG_DIR/$ip not exist,"
+			echo "create new config based on: $PXE_ROOT/$PXE_CONFIG_DIR/default"
+			cp $PXE_ROOT/$PXE_CONFIG_DIR/default $PXE_ROOT/$PXE_CONFIG_DIR/$ip
+		fi
+		setup_pxe_config "$PXE_ROOT/$PXE_CONFIG_DIR/$ip" "$PXE_KERNEL_DIR/$kernel_img" "$PXE_KERNEL_DIR/$initrd_img" "$boot_opts" "$title_msg" || exit 1;
+        	rm -rf $PXE_ROOT/$PXE_CONFIG_DIR/$hex_ip ;
+		ln -s $ip $PXE_ROOT/$PXE_CONFIG_DIR/$hex_ip ;;
+*	)	echo "Unknown action";
+		show_usage;
+		exit 1;;
+esac

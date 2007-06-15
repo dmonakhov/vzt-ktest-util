@@ -1,0 +1,175 @@
+#!/bin/bash
+# Install kernel to test host
+function show_usage
+{
+	echo "$0: <host> [OPTS]"
+	echo "Usage:"
+	echo "Install kernele to test host via ssh or pxe"
+	echo "Examples:"
+	echo "Install kernel, modules and initrd to host via ssh and setup local boot loader"
+	echo "	$0 my_host.org --all"
+	echo "Install kernel only via ssh and setup local boot loader"
+	echo "	$0 my_host.org "
+	echo "Install kernel and setup pxe boot loader"
+	echo "	$0 my_host --pxe"
+	echo "Disable pxe boot  for host"
+	echo "	$0 my_host --pxe --disable"
+	
+}	
+
+if [ ! -f ".vzt-kernel-install" ]; then
+	echo "Cant find .vzt-kern-install"
+	exit
+fi
+. .vzt-kernel-install
+krel=`make kernelrelease`
+
+if [ ! $? -eq 0 ]; then
+	echo "Can't get kernel release version"
+	echo "This is probably happend CWD is wrong."
+	echo "do: cd /your/path/to/kernel/linux-tree/"
+	show_usage
+	exit 1
+fi
+function SSH
+{
+	ssh -n -oStrictHostKeyChecking=no -oBatchMode=yes $@
+	return $?
+}
+
+host="${1}"
+shift
+if [ -z "$host" ] ;then 
+	echo "Err: Bad arguments"
+	show_usage
+	exit 1
+fi
+boot_proto=local
+modules=n
+mkinitrd=n
+if [ "$1" = "--pxe" ]; then
+	boot_proto="pxe"
+	shift
+fi
+
+if [ "$1" = "--all" ]; then
+	modules=y
+	mkinitrd=y
+	shift
+fi
+
+if [ "$1" = "--suffix" ]; then
+	shift
+	krel=${krel}-${1}
+	shift
+fi
+
+if [ "$1" = "--initrd" ]; then
+	mkinitrd=y
+	shift
+fi
+
+if [ "$1" = "--disable" ]; then
+	if [ "$boot_proto" = "pxe" ]; then
+		SSH root@$PXE_SERVER " vzt-pxe-boot $host del"
+		exit $?
+	else
+		echo "ERR: --disable option valid only for pxe boot mode"
+		exit 1
+	fi
+fi
+
+title="kernel-$krel"
+echo "Install kernel to $server via protocol: $boot_proto"
+
+if [ $modules == "y" ]; then
+	make modules_install || exit 1;
+	tar zcf modules-$krel.tar.gz /lib/modules/$krel || exit 1
+	scp modules-$krel.tar.gz root@$host:/tmp || exit 1
+	SSH root@$host "rm \-rf /lib/modules/$krel " || exit 1
+	SSH root@$host " tar zxf /tmp/modules-$krel.tar.gz -C / "|| exit 1
+	SSH root@$host "mkinitrd \-f /boot/initrd-$krel.img $krel $MKINITRD_OPT" || exit 1
+	rm -f modules-$krel.tar.gz
+	mkinitrd=n
+fi
+
+##### pxe boot #####
+if [ $boot_proto == "pxe" ] ;then
+	echo "$BOOT_OPTS" | egrep "[^[:space:]]+"
+	if [ $? -ne 0 ];then
+		echo "Err: 'BOOT_OPTS' is empty. You must specify correct boot options"
+		exit 1
+	fi
+	cp arch/$ARCH/boot/bzImage vmlinuz-$krel || exit 1
+	vmlinuz-$krel root@$PXE_SERVER:/$PXE_ROOT/$PXE_KERNEL_DIR/vmlinuz-$krel \
+		|| exit 1
+	rm -f vmlinuz-$krel || exit 1
+	SSH root@$PXE_SERVER " chmod 0444 /$PXE_ROOT/$PXE_KERNEL_DIR/vmlinuz-$krel"
+	if [ $mkinitrd == "y" ]; then
+		echo "Using initrd from different host is realy errorprone way."
+		echo "kernel probably can't boot with this initrd image"
+		scp initrd-$krel.img root@$PXE_SERVER:/$PXE_ROOT/$PXE_KERNEL_DIR || exit 1
+		SSH root@$PXE_SERVER " chmod 0444 /$PXE_ROOT/$PXE_KERNEL_DIR/initrd-$krel.img "
+	fi
+	SSH root@$PXE_SERVER " vzt-pxe-boot $host add vmlinuz-$krel initrd-$krel.img '$BOOT_OPTS' $title"
+	exit $?
+fi
+
+function grub_setup
+{
+	host=$1
+	shift
+	kernel_img=$1
+	shift
+	initrd_img=$1
+	shift
+	title_text=$1
+	shift
+	boot_opt=$@
+
+	ssh root@${host} test  /boot/${kernel_img} || {
+		cho "Kernel image : /boot/${kernel_img} not found";
+		exit 1;
+	}
+
+	ssh root@${host} test /boot/${initrd_img} || {
+		echo "initrd image :/boot/${initrd_img} not found" ;
+		exit 1;
+	}
+
+	if [ -z "$boot_opt" ]; then
+		args=--copy-default
+	else
+		args='--args=$boot_opt'
+	fi
+	ssh root@${host} grubby --remove-kernel=/boot/${kernel_img} \
+				--add-kernel=/boot/${kernel_img} \
+				--initrd=/boot/${initrd_img} \
+				$args --title="${title_text}" \
+				--make-default
+	ret=$?
+	if [ $ret -ne 0 ] ;then
+		echo "Error while grub setup"
+	else
+		echo "grub setup OK"
+	fi
+	return $ret
+}
+
+
+##### local boot  #####
+if [ $boot_proto == "local" ]; then
+	cp arch/$ARCH/boot/bzImage vmlinuz-$krel || exit
+	scp vmlinuz-$krel root@$host:/boot/vmlinuz-$krel || exit 1
+	rm -f vmlinuz-$krel || exit 1
+	if [ $mkinitrd == "y" ]; then
+		SSH root@$host "mkinitrd \-f /boot/initrd-$krel.img $krel $MKINITRD_OPT" || exit 1
+	fi
+	grub_setup $host vmlinuz-$krel initrd-$krel.img $title $BOOT_OPTS \
+	#SSH root@$host " ls -l  "
+	exit $?
+fi
+#################
+echo "Bad boot protocol" ; 
+exit 1
+
