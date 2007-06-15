@@ -8,7 +8,7 @@ CONFIGS = vzt-pductl.cfg vzt-pxe-boot.cfg kernel-install.cfg.example
 
 check:
 	@if [ ! -d "$(SNMP_MIBS_DIR)" ]; then \
-		echo "Error: seems net-snmp not intalled";  \
+		echo "Error: seems net-snmp or net-snmp-utils not intalled";  \
 		exit 1 ; \
 	fi \
 
