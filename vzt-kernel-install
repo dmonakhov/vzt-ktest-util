@@ -92,7 +92,7 @@ if [ $modules == "y" ]; then
 	tar zcf modules-$krel.tar.gz /lib/modules/$krel || exit 1
 	scp modules-$krel.tar.gz root@$host:/tmp || exit 1
 	SSH root@$host "rm \-rf /lib/modules/$krel " || exit 1
-	SSH root@$host " tar zxf /tmp/modules-$krel.tar.gz -C / "|| exit 1
+	SSH root@$host " tar mzxf /tmp/modules-$krel.tar.gz -C / "|| exit 1
 	SSH root@$host "mkinitrd \-f /boot/initrd-$krel.img $krel $MKINITRD_OPT" || exit 1
 	rm -f modules-$krel.tar.gz
 	mkinitrd=n
