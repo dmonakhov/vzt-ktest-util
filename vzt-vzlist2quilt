@@ -1,0 +1,122 @@
+#! /bin/bash
+
+function show_usage
+{
+	echo "Create plain patch list from list-XXX and XXX.spec"
+	echo "Usage:	-d|--patch_dir Virtuozzo/kernel-patches/<PATCH_DIR> "
+        echo "	-s|--spec_file <SPEC_FILE>"
+	echo "	-l|--list  listname script will  it as list-<LIST_NAME>"
+	echo "	-r|--revision kernel-ve cvs revision tag"
+	echo "	-c make local copy for patches"
+	echo "	-u make cvs update before."	
+	exit
+}
+. /etc/vzt-cvs.cfg
+update=0
+local_copy=0
+while [ $# -gt 0 ]; do
+	case "$1" in
+		-h|--help)
+			show_usage
+			exit
+			;;
+		-u)
+			update=1
+			;;
+		-d|--patch_dir)
+			patch_dir=$2
+			shift
+			;;
+		-r|--revision)
+			revision=$2
+			shift
+			;;
+		-l|--list)
+			list=$2
+			shift
+			;;
+		-s|--spec)
+			spec=$2
+			shift
+			;;
+		-c|--copy)
+			local_copy=1
+			;;
+		*)
+			show_usage
+			break
+			;;
+	esac
+	shift
+done
+
+. guilt 
+if [ -z "$list" ]; then
+	echo "list not defined"
+	exit
+fi
+
+if [ -z "$spec" ]; then
+	echo "spec not defined"
+	exit
+fi
+if [ -z "$revision" ]; then
+	echo "revision not defined"
+	exit
+fi
+
+if [ -z "$patch_dir" ]; then
+	echo "patch_dir not defined"
+	exit
+fi
+echo "list:		$list"
+echo "spec:		$spec"
+echo "revision:	$revision"
+echo "patch_dir:	$patch_dir"
+
+
+function update_cvs {
+	local vzcvsroot=$1 
+	local patch_dir=$2
+	local revision=$3
+	local cwd=`pwd`
+	cd $vzcvsroot
+	cvs up kernel-patches/$patch_dir
+	cvs up kernel-ve/kernel-ve
+	cd $cwd
+}
+
+function make_quilt_tree {
+	list=$1
+	spec=$2
+	local_copy=$3
+		
+	if [ ! -f "$GUILT_DIR/$branch/series" ]; then
+		die "$GUILT_DIR/$branch/series does not exist. Aborting."
+	fi
+	if [ ! -f "$list" ]; then
+		echo "No such list $list_file"
+		exit
+	fi
+
+	if [ ! -f "$spec" ]; then
+		echo "No such spec $spec_file"
+		exit
+	fi
+	bash -x ./vzt-show-list -l $list -s $spec -p . > $GUILT_DIR/$branch/series.tmp || exit
+	
+	ln -s `dirname $list` $GUILT_DIR/$branch/patches 	
+	ln -s `dirname $spec` $GUILT_DIR/$branch/vzmod
+	if [ $local_copy == 1 ]; then
+		cp  -r $GUILT_DIR/$branch/patches/ $GUILT_DIR/$branch/patches.copy/
+		cp  -r $GUILT_DIR/$branch/vzmod/ $GUILT_DIR/$branch/vzmod.copy/
+	fi	
+	mv $GUILT_DIR/$branch/series.tmp $GUILT_DIR/$branch/series || exit 
+	echo "OK"
+}
+if [ $update == 1 ]; then
+	update_cvs $VZCVSROOT $patch_dir $revision
+fi
+
+make_quilt_tree $VZCVSROOT/kernel-patches/$patch_dir/list-$list \
+	 $VZCVSROOT/kernel-ve/kernel-ve/$spec.spec $local_copy

@@ -1,0 +1,101 @@
+#! /bin/bash
+
+function show_usage
+{
+	echo "Create plain patch list from list-XXX and XXX.spec"
+	echo "Usage:	-l|--list_file <LIST_FILE> "
+        echo "	-s|--spec_file <SPEC_FILE>"
+	echo "	-p|--prefix <PREFIX_PATH>  patch prefix"	
+	exit
+}
+
+while [ $# -gt 0 ]; do
+	case "$1" in
+		-h|--help)
+			show_usage
+			exit
+			;;
+		-l|--list_file)
+			list_file=$2
+			shift
+			;;
+		-s|--spec_file)
+			spec_file=$2
+			shift
+			;;
+		-p|--prefix)
+			prefix_dir=$2
+			shift
+			;;
+		*)
+			show_usage
+			break
+			;;
+	esac
+	shift
+done
+
+list_dir=`dirname $list_file`
+patch_dir=$list_dir
+spec_dir=`dirname $spec_file`
+out_patch_dir=$prefix_dir/patches
+out_vzmod_dir=$prefix_dir/vzmod
+
+if [ ! -f "$list_file" ]; then
+	echo "No such list $list_file"
+	exit
+fi
+
+if [ ! -f "$spec_file" ]; then
+	echo "No such spec $spec_file"
+	exit
+fi
+
+function cat_list_file
+{
+	ldir=$1
+	lfile=$2
+	odir=$3
+	cat "$lfile" | grep -v '^[:space:]*$' | \
+	while read patch rest; do
+		echo $patch | grep  '^[:space:]*#' && {
+			echo $patch $rest
+			continue
+		}
+		if [ "$patch"  = "include" ]; then
+			echo "#-> $rest"
+			cat_list_file "$ldir" "$ldir/$rest" "$odir"
+			echo "#<- $rest"
+			continue
+		fi
+		if [ "$patch" = "cd" ]; then
+			echo "#cd $rest"
+			continue
+		fi
+		if [ "$patch" = "merge" ]; then
+			echo "#merge $rest"
+			continue
+		fi
+		echo $odir/$patch
+	done
+}
+
+function cat_spec_file {
+
+	sdir=$1
+	sfile=$2
+	odir=$3
+	odir_scr="$(echo $odir | sed -r 's/\//\\\//g')"
+	cat $sfile | \
+	awk 'BEGIN{lock=1}{
+		if ($0 ~ /# Start VZ patches/) lock=0;\
+		if (lock==0) print $0;\
+		if ($0 ~ /# End VZ patches/) lock=1 ;\
+	}' | \
+	sed -r "s/^Patch[0-9]+:[[:space:]]+/$odir_scr\//" | \
+	grep -v "^$odir/patch-%{ovzver}-core"| \
+	grep -v "^$odir/patch-%{ovzver}-mod"
+}
+
+cat_list_file $list_dir $list_file $out_patch_dir
+cat_spec_file $spec_dir $spec_file $out_vzmod_dir
