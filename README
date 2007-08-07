@@ -1,0 +1,10 @@
+FIXME: write full description for all commands
+#################################################
+COMMAND LIST
+vzt-pductl: PowerSwitch comand line management tool (pdu00.qa.sw.ru supported
+	    out of box)
+vzt-kernel-install: Automatic kernel deployment script
+vzt-pxe-boot: kernel-install helper. boot via pxe (repo.qa.sw.ru supported out 
+		of box)
+vzt-vzlist2quilt: Create full vz kernel patch list (including drivers) and 
+		  generate guilt repo.
