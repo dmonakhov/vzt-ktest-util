@@ -86,6 +86,25 @@ function update_cvs {
 	cd $cwd
 }
 
+function update_makefile_version
+{
+	lnum=$1
+	if [ ! -f "$GUILT_DIR/$branch/series" ]; then
+		die "$GUILT_DIR/$branch/series does not exist. Aborting."
+	fi
+	
+	echo "Fixing uname"
+	cp Makefile Makefile.vers
+	sed -e "s/\\(^EXTRAVERSION =\\)[^\$]*\$/\\1 -${lnum//-shadow/}/" \
+	    -e "s/\\(^EXTRAVERSION =\\) [^\$]\\+\\$/\\1 -${lnum//-shadow/}-\$/" \
+	      Makefile.vers > Makefile
+	
+	git-diff Makefile > diff-update-uname-to-$lnum
+	git-checkout Makefile
+	mv diff-update-uname-to-$lnum $GUILT_DIR/$branch || exit
+	echo diff-update-uname-to-$lnum >> $GUILT_DIR/$branch/series
+}
+
 function make_quilt_tree {
 	list=$1
 	spec=$2
@@ -118,5 +137,7 @@ if [ $update == 1 ]; then
 	update_cvs $VZCVSROOT $patch_dir $revision
 fi
 
+update_makefile_version $list-partial
 make_quilt_tree $VZCVSROOT/kernel-patches/$patch_dir/list-$list \
 	 $VZCVSROOT/kernel-ve/kernel-ve/$spec.spec $local_copy
+update_makefile_version $list
