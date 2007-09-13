@@ -122,7 +122,7 @@ function make_quilt_tree {
 		echo "No such spec $spec_file"
 		exit
 	fi
-	bash -x ./vzt-show-list -l $list -s $spec -p . > $GUILT_DIR/$branch/series.tmp || exit
+	vzt-show-list -l $list -s $spec -p . > $GUILT_DIR/$branch/series.tmp || exit
 	
 	ln -s `dirname $list` $GUILT_DIR/$branch/patches 	
 	ln -s `dirname $spec` $GUILT_DIR/$branch/vzmod
