@@ -96,6 +96,8 @@ function cat_spec_file {
 	grep -v "^$odir/patch-%{ovzver}-core"| \
 	grep -v "^$odir/patch-%{ovzver}-mod"
 }
-
+echo "update-uname-core-begin"
 cat_list_file $list_dir $list_file $out_patch_dir
+echo "update-uname-mod-begin"
 cat_spec_file $spec_dir $spec_file $out_vzmod_dir
+echo "update-uname-mod-end"

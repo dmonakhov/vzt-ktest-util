@@ -3,7 +3,8 @@ SBINDIR = /usr/bin
 CONFDIR = /etc/vzt
 MIBSDIR = /usr/share/snmp/mibs
 ###################################
-SCRIPTS = vzt-pductl vzt-kernel-install vzt-pxe-boot 
+SCRIPTS = vzt-kernel-install  vzt-pxe-boot    vzt-show-list \
+vzt-pductl vzt-set-kernel  vzt-vzlist2quilt
 CONFIGS = vzt-pductl.cfg vzt-pxe-boot.cfg kernel-install.cfg.example
 
 check:

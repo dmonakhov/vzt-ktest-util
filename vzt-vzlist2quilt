@@ -137,7 +137,7 @@ if [ $update == 1 ]; then
 	update_cvs $VZCVSROOT $patch_dir $revision
 fi
 
-update_makefile_version $list-partial
+#update_makefile_version $list-partial
 make_quilt_tree $VZCVSROOT/kernel-patches/$patch_dir/list-$list \
 	 $VZCVSROOT/kernel-ve/kernel-ve/$spec.spec $local_copy
-update_makefile_version $list
+#update_makefile_version $list
