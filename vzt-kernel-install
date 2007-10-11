@@ -89,11 +89,14 @@ echo "Install kernel to $server via protocol: $boot_proto"
 
 if [ $modules == "y" ]; then
 	make modules_install || exit 1;
-	tar zcf modules-$krel.tar.gz /lib/modules/$krel || exit 1
+	tar zcf modules-$krel.tar.gz /lib/modules/$krel \
+--exclude /lib/modules/$krel/build \
+--exclude /lib/modules/$krel/source || exit 1
 	scp modules-$krel.tar.gz root@$host:/tmp || exit 1
 	SSH root@$host "rm \-rf /lib/modules/$krel " || exit 1
 	SSH root@$host " tar mzxf /tmp/modules-$krel.tar.gz -C / "|| exit 1
 	SSH root@$host "mkinitrd \-f /boot/initrd-$krel.img $krel $MKINITRD_OPT" || exit 1
+	SSH root@$host " wall 'modules was intalled to /lib/modules/$krel'"
 	rm -f modules-$krel.tar.gz
 	mkinitrd=n
 fi
@@ -156,6 +159,8 @@ function grub_setup
 	if [ $ret -ne 0 ] ;then
 		echo "Error while grub setup"
 	else
+		SSH root@$host " wall 'grub default was changed to /boot/\
+${kernel_img}'"
 		echo "grub setup OK"
 	fi
 	return $ret
@@ -167,6 +172,7 @@ if [ $boot_proto == "local" ]; then
 	cp arch/$ARCH/boot/bzImage vmlinuz-$krel || exit
 	scp vmlinuz-$krel root@$host:/boot/vmlinuz-$krel || exit 1
 	rm -f vmlinuz-$krel || exit 1
+	SSH root@$host "wall 'new kernel was intalled to /boot/vmlinuz-$krel'"
 	if [ $mkinitrd == "y" ]; then
 		SSH root@$host "mkinitrd \-f /boot/initrd-$krel.img $krel $MKINITRD_OPT" || exit 1
 	fi
