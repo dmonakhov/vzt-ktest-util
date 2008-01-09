@@ -172,6 +172,11 @@ if [ $boot_proto == "local" ]; then
 	cp arch/$ARCH/boot/bzImage vmlinuz-$krel || exit
 	scp vmlinuz-$krel root@$host:/boot/vmlinuz-$krel || exit 1
 	rm -f vmlinuz-$krel || exit 1
+#system.map setup
+	scp System.map root@$host:/boot/System.map-$krel || exit 1
+	SSH root@$host "rm -rf /boot/System.map" || exit 1
+	SSH root@$host "ln -s /boot/System.map-$krel /boot/System.map"
+
 	SSH root@$host "wall 'new kernel was intalled to /boot/vmlinuz-$krel'"
 	if [ $mkinitrd == "y" ]; then
 		SSH root@$host "mkinitrd \-f /boot/initrd-$krel.img $krel $MKINITRD_OPT" || exit 1
