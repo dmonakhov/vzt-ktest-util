@@ -150,17 +150,18 @@ function grub_setup
 	else
 		args='--args=$boot_opt'
 	fi
-	ssh root@${host} grubby --remove-kernel=/boot/${kernel_img} \
+	SSH root@${host} grubby --remove-kernel=/boot/${kernel_img} \
 				--add-kernel=/boot/${kernel_img} \
 				--initrd=/boot/${initrd_img} \
-				$args --title="${title_text}" \
-				--make-default
+				$args --title="${title_text}"
 	ret=$?
 	if [ $ret -ne 0 ] ;then
 		echo "Error while grub setup"
 	else
-		SSH root@$host " wall 'grub default was changed to /boot/\
-${kernel_img}'"
+		echo "savedefault --default=0 --once" | \
+				ssh root@$host "grub --batch"
+		SSH root@$host " wall 'grub: savedefault --default=/boot/\
+		${kernel_img} --once'"
 		echo "grub setup OK"
 	fi
 	return $ret
