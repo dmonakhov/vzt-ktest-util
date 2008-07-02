@@ -38,6 +38,10 @@ function power_net_mib
 			rPDUOutletControlOutletCommand.$host;;
 	reboot	)	snmpset -c private -v 1 -m +PowerNet-MIB $pdu_host \
 			rPDUOutletControlOutletCommand.$host = immediateReboot;;
+	on )		snmpset -c private -v 1 -m +PowerNet-MIB $pdu_host \
+			rPDUOutletControlOutletCommand.$host = immediateOn;;
+	off )		snmpset -c private -v 1 -m +PowerNet-MIB $pdu_host \
+			rPDUOutletControlOutletCommand.$host = immediateOff;;
 	*	)	echo "Unknown action";
 			show_usage;
 		exit 1;;
