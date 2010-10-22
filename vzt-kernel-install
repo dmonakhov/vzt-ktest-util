@@ -52,6 +52,7 @@ fi
 boot_proto=local
 modules=n
 mkinitrd=n
+vmlinux=n
 if [ "$1" = "--pxe" ]; then
 	boot_proto="pxe"
 	shift
@@ -59,6 +60,7 @@ fi
 
 if [ "$1" = "--all" ]; then
 	modules=y
+	vmlinux=y
 	mkinitrd=y
 	shift
 fi
@@ -71,6 +73,11 @@ fi
 
 if [ "$1" = "--initrd" ]; then
 	mkinitrd=y
+	shift
+fi
+
+if [ "$1" = "--vmlinux" ]; then
+	vmlinux=y
 	shift
 fi
 
@@ -95,6 +102,7 @@ if [ $modules == "y" ]; then
 	scp modules-$krel.tar.gz root@$host:/tmp || exit 1
 	SSH root@$host "rm \-rf /lib/modules/$krel " || exit 1
 	SSH root@$host " tar mzxf /tmp/modules-$krel.tar.gz -C / "|| exit 1
+	SSH root@$host "depmod $krel"
 	SSH root@$host "mkinitrd \-f /boot/initrd-$krel.img $krel $MKINITRD_OPT" || exit 1
 	SSH root@$host " wall 'modules was intalled to /lib/modules/$krel'"
 	rm -f modules-$krel.tar.gz
@@ -159,7 +167,7 @@ function grub_setup
 		echo "Error while grub setup"
 	else
 		echo "savedefault --default=0 --once" | \
-				ssh root@$host "grub --batch"
+				ssh root@$host "grub --batch > /dev/null"
 		SSH root@$host " wall 'grub: savedefault --default=/boot/\
 		${kernel_img} --once'"
 		echo "grub setup OK"
@@ -177,11 +185,16 @@ if [ $boot_proto == "local" ]; then
 	scp System.map root@$host:/boot/System.map-$krel || exit 1
 	SSH root@$host "rm -rf /boot/System.map" || exit 1
 	SSH root@$host "ln -s /boot/System.map-$krel /boot/System.map"
+#vmlinux
+	if [ $vmlinux == "y" ]; then
+	    scp ./vmlinux root@$host:/boot/vmlinux-$krel || exit 1
+	fi
 
 	SSH root@$host "wall 'new kernel was intalled to /boot/vmlinuz-$krel'"
 	if [ $mkinitrd == "y" ]; then
 		SSH root@$host "mkinitrd \-f /boot/initrd-$krel.img $krel $MKINITRD_OPT" || exit 1
 	fi
+
 	grub_setup $host vmlinuz-$krel initrd-$krel.img $title $BOOT_OPTS \
 	#SSH root@$host " ls -l  "
 	exit $?
