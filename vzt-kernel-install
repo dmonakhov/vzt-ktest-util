@@ -38,7 +38,7 @@ if [ ! $? -eq 0 ]; then
 fi
 function SSH
 {
-	ssh -n -oStrictHostKeyChecking=no -oBatchMode=yes $@
+	ssh -oStrictHostKeyChecking=no -oBatchMode=yes $@
 	return $?
 }
 
@@ -50,9 +50,10 @@ if [ -z "$host" ] ;then
 	exit 1
 fi
 boot_proto=local
-modules=n
-mkinitrd=n
-vmlinux=n
+modules=y
+mkinitrd=y
+vmlinux=y
+reboot=n
 if [ "$1" = "--pxe" ]; then
 	boot_proto="pxe"
 	shift
@@ -81,33 +82,12 @@ if [ "$1" = "--vmlinux" ]; then
 	shift
 fi
 
-if [ "$1" = "--disable" ]; then
-	if [ "$boot_proto" = "pxe" ]; then
-		SSH root@$PXE_SERVER " vzt-pxe-boot $host del"
-		exit $?
-	else
-		echo "ERR: --disable option valid only for pxe boot mode"
-		exit 1
-	fi
+if [ "$1" = "--reboot" ]; then
+    reboot=y
 fi
 
 title="kernel-$krel"
 echo "Install kernel to $server via protocol: $boot_proto"
-
-if [ $modules == "y" ]; then
-	make modules_install || exit 1;
-	tar zcf modules-$krel.tar.gz /lib/modules/$krel \
---exclude /lib/modules/$krel/build \
---exclude /lib/modules/$krel/source || exit 1
-	scp modules-$krel.tar.gz root@$host:/tmp || exit 1
-	SSH root@$host "rm \-rf /lib/modules/$krel " || exit 1
-	SSH root@$host " tar mzxf /tmp/modules-$krel.tar.gz -C / "|| exit 1
-	SSH root@$host "depmod $krel"
-	SSH root@$host "mkinitrd \-f /boot/initrd-$krel.img $krel $MKINITRD_OPT" || exit 1
-	SSH root@$host " wall 'modules was intalled to /lib/modules/$krel'"
-	rm -f modules-$krel.tar.gz
-	mkinitrd=n
-fi
 
 ##### pxe boot #####
 if [ $boot_proto == "pxe" ] ;then
@@ -144,7 +124,7 @@ function grub_setup
 	boot_opt=$@
 
 	ssh root@${host} test  /boot/${kernel_img} || {
-		cho "Kernel image : /boot/${kernel_img} not found";
+		echo "Kernel image : /boot/${kernel_img} not found";
 		exit 1;
 	}
 
@@ -168,8 +148,8 @@ function grub_setup
 	else
 		echo "savedefault --default=0 --once" | \
 				ssh root@$host "grub --batch > /dev/null"
-		SSH root@$host " wall 'grub: savedefault --default=/boot/\
-		${kernel_img} --once'"
+		SSH root@$host " wall 'grub: ${kernel_img} --once'"
+		SSH root@$host " echo 'grub: ${kernel_img} --once'  > /dev/kmsg"
 		echo "grub setup OK"
 	fi
 	return $ret
@@ -178,24 +158,24 @@ function grub_setup
 
 ##### local boot  #####
 if [ $boot_proto == "local" ]; then
-	cp arch/$ARCH/boot/bzImage vmlinuz-$krel || exit
-	scp vmlinuz-$krel root@$host:/boot/vmlinuz-$krel || exit 1
-	rm -f vmlinuz-$krel || exit 1
-#system.map setup
-	scp System.map root@$host:/boot/System.map-$krel || exit 1
-	SSH root@$host "rm -rf /boot/System.map" || exit 1
-	SSH root@$host "ln -s /boot/System.map-$krel /boot/System.map"
-#vmlinux
-	if [ $vmlinux == "y" ]; then
-	    scp ./vmlinux root@$host:/boot/vmlinux-$krel || exit 1
-	fi
+    	make tar-pkg
+	#scp linux-$krel.tar.bz2 root@$host:/tmp/linux-$krel.tar.bz2 || exit 1
 
-	SSH root@$host "wall 'new kernel was intalled to /boot/vmlinuz-$krel'"
+	cat linux-$krel.tar | SSH root@$host " tar mx  -C / " || exit 1
+	SSH root@$host "echo 'new kernel and was intalled to /boot/vmlinuz-$krel' > /dev/kmsg"
+	SSH root@$host "wall 'new kernel and was intalled to /boot/vmlinuz-$krel'"
+
 	if [ $mkinitrd == "y" ]; then
-		SSH root@$host "mkinitrd \-f /boot/initrd-$krel.img $krel $MKINITRD_OPT" || exit 1
+	    SSH root@$host "depmod $krel"	        
+	    SSH root@$host "mkinitrd \-f /boot/initrd-$krel.img $krel $MKINITRD_OPT" || exit 1
+	fi
+	grub_setup $host vmlinuz-$krel initrd-$krel.img $title $BOOT_OPTS
+
+	if [ $reboot == "y" ]; then
+	    SSH root@$host "reboot"	        
 	fi
 
-	grub_setup $host vmlinuz-$krel initrd-$krel.img $title $BOOT_OPTS \
+
 	#SSH root@$host " ls -l  "
 	exit $?
 fi
