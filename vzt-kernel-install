@@ -123,12 +123,12 @@ function grub_setup
 	shift
 	boot_opt=$@
 
-	ssh root@${host} test  /boot/${kernel_img} || {
+	SSH root@${host} test  /boot/${kernel_img} || {
 		echo "Kernel image : /boot/${kernel_img} not found";
 		exit 1;
 	}
 
-	ssh root@${host} test /boot/${initrd_img} || {
+	SSH root@${host} test /boot/${initrd_img} || {
 		echo "initrd image :/boot/${initrd_img} not found" ;
 		exit 1;
 	}
@@ -158,10 +158,9 @@ function grub_setup
 
 ##### local boot  #####
 if [ $boot_proto == "local" ]; then
-    	make tar-pkg
-	#scp linux-$krel.tar.bz2 root@$host:/tmp/linux-$krel.tar.bz2 || exit 1
-
-	cat linux-$krel.tar | SSH root@$host " tar mx  -C / " || exit 1
+    	make targz-pkg
+	SSH root@$host "type pigz &>/dev/null" && gzip=pigz || gzip=gzip
+	cat linux-$krel.tar.gz | SSH root@$host " $gzip -d | tar mx  -C / " || exit 1
 	SSH root@$host "echo 'new kernel and was intalled to /boot/vmlinuz-$krel' > /dev/kmsg"
 	SSH root@$host "wall 'new kernel and was intalled to /boot/vmlinuz-$krel'"
 
