@@ -28,7 +28,7 @@ if [ ! -f "$CONFIG" ]; then
 	exit
 fi
 . $CONFIG
-krel=`make kernelrelease`
+krel=`make -s kernelrelease`
 
 if [ ! $? -eq 0 ]; then
 	echo "Can't get kernel release version"
