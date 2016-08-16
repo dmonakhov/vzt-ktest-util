@@ -1,6 +1,7 @@
 #!/bin/bash
 # Install kernel to test host
 CONFIG=.vzt/kernel-install.cfg
+ARCH_SFX=x86
 function show_usage
 {
 	echo "$0: <host> [OPTS]"
@@ -50,7 +51,7 @@ if [ -z "$host" ] ;then
 	exit 1
 fi
 boot_proto=local
-modules=y
+modules=n
 mkinitrd=y
 vmlinux=y
 reboot=n
@@ -76,6 +77,12 @@ if [ "$1" = "--initrd" ]; then
 	mkinitrd=y
 	shift
 fi
+
+if [ "$1" = "--noinitrd" ]; then
+	mkinitrd=n
+	shift
+fi
+
 
 if [ "$1" = "--vmlinux" ]; then
 	vmlinux=y
@@ -159,8 +166,13 @@ function grub_setup
 ##### local boot  #####
 if [ $boot_proto == "local" ]; then
     	make targz-pkg
+	target_pkg=linux-$krel.tar.gz
+	[ -f linux-$krel-$ARCH_SFX.tar.gz ] && target_pkg="linux-$krel-$ARCH_SFX.tar.gz" 
+	[ -f ./tar-install/linux-$krel-$ARCH_SFX.tar.gz ] && target_pkg="./tar-install/linux-$krel-$ARCH_SFX.tar.gz" 
+
 	SSH root@$host "type pigz &>/dev/null" && gzip=pigz || gzip=gzip
-	cat linux-$krel.tar.gz | SSH root@$host " $gzip -d | tar mx  -C / " || exit 1
+	cat $target_pkg | SSH root@$host " $gzip -d | tar mx --exclude=boot/vmlinux-$krel -C / " || exit 1
+	lbzip2 -c vmlinux | SSH root@$host "cat > /lib/modules/$krel/vmlinux.bz2" || exit 1
 	SSH root@$host "echo 'new kernel and was intalled to /boot/vmlinuz-$krel' > /dev/kmsg"
 	SSH root@$host "wall 'new kernel and was intalled to /boot/vmlinuz-$krel'"
 
