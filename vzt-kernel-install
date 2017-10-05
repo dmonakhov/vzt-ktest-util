@@ -55,6 +55,7 @@ modules=n
 mkinitrd=y
 vmlinux=y
 reboot=n
+kreboot=n
 if [ "$1" = "--pxe" ]; then
 	boot_proto="pxe"
 	shift
@@ -93,6 +94,10 @@ if [ "$1" = "--reboot" ]; then
     reboot=y
 fi
 
+if [ "$1" = "--kreboot" ]; then
+    kreboot=y
+fi
+
 title="kernel-$krel"
 echo "Install kernel to $server via protocol: $boot_proto"
 
@@ -111,10 +116,10 @@ if [ $boot_proto == "pxe" ] ;then
 	if [ $mkinitrd == "y" ]; then
 		echo "Using initrd from different host is realy errorprone way."
 		echo "kernel probably can't boot with this initrd image"
-		scp initrd-$krel.img root@$PXE_SERVER:/$PXE_ROOT/$PXE_KERNEL_DIR || exit 1
-		SSH root@$PXE_SERVER " chmod 0444 /$PXE_ROOT/$PXE_KERNEL_DIR/initrd-$krel.img "
+		scp initramfs-$krel.img root@$PXE_SERVER:/$PXE_ROOT/$PXE_KERNEL_DIR || exit 1
+		SSH root@$PXE_SERVER " chmod 0444 /$PXE_ROOT/$PXE_KERNEL_DIR/initramfs-$krel.img "
 	fi
-	SSH root@$PXE_SERVER " vzt-pxe-boot $host add vmlinuz-$krel initrd-$krel.img '$BOOT_OPTS' $title"
+	SSH root@$PXE_SERVER " vzt-pxe-boot $host add vmlinuz-$krel initramfs-$krel.img '$BOOT_OPTS' $title"
 	exit $?
 fi
 
@@ -145,11 +150,13 @@ function grub_setup
 	else
 		args='--args=$boot_opt'
 	fi
+	SSH root@$host "sync;sync"
 	SSH root@${host} grubby --remove-kernel=/boot/${kernel_img} \
 				--add-kernel=/boot/${kernel_img} \
 				--initrd=/boot/${initrd_img} \
 				$args --title="${title_text}"
 	ret=$?
+	
 	if [ $ret -ne 0 ] ;then
 		echo "Error while grub setup"
 	else
@@ -171,6 +178,8 @@ if [ $boot_proto == "local" ]; then
 	[ -f ./tar-install/linux-$krel-$ARCH_SFX.tar.gz ] && target_pkg="./tar-install/linux-$krel-$ARCH_SFX.tar.gz" 
 
 	SSH root@$host "type pigz &>/dev/null" && gzip=pigz || gzip=gzip
+	# Cleanup old modules to prevent conflict with stale versions.
+	SSH root@$host "rm -rf /lib/modules/$krel"
 	cat $target_pkg | SSH root@$host " $gzip -d | tar mx --exclude=boot/vmlinux-$krel -C / " || exit 1
 	lbzip2 -c vmlinux | SSH root@$host "cat > /lib/modules/$krel/vmlinux.bz2" || exit 1
 	SSH root@$host "echo 'new kernel and was intalled to /boot/vmlinuz-$krel' > /dev/kmsg"
@@ -178,12 +187,16 @@ if [ $boot_proto == "local" ]; then
 
 	if [ $mkinitrd == "y" ]; then
 	    SSH root@$host "depmod $krel"	        
-	    SSH root@$host "mkinitrd \-f /boot/initrd-$krel.img $krel $MKINITRD_OPT" || exit 1
+	    SSH root@$host "mkinitrd \-f /boot/initramfs-$krel.img $krel $MKINITRD_OPT" || exit 1
 	fi
-	grub_setup $host vmlinuz-$krel initrd-$krel.img $title $BOOT_OPTS
+	grub_setup $host vmlinuz-$krel initramfs-$krel.img $title $BOOT_OPTS
 
 	if [ $reboot == "y" ]; then
 	    SSH root@$host "reboot"	        
+	fi
+
+	if [ $kreboot == "y" ]; then
+	    SSH root@$host "kreboot  /boot/vmlinuz-$krel -w 0"
 	fi
 
 
