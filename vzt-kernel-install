@@ -169,6 +169,24 @@ function grub_setup
 	return $ret
 }
 
+function _avocado_archive()
+{
+	if [ -z "$AVOCADO_TEST_OUTPUTDIR" ]; then
+		return
+	fi
+	if [ ! -d "$AVOCADO_TEST_OUTPUTDIR" ];then
+		return
+	fi
+	cat .config | lbzip2  > $AVOCADO_TEST_OUTPUTDIR/kconfig.bz2
+	guilt export $AVOCADO_TEST_OUTPUTDIR/patches
+	git diff > $AVOCADO_TEST_OUTPUTDIR/patches/9999-uncommitted.diff
+	tar c -C $AVOCADO_TEST_OUTPUTDIR patches | lbzip2 > $AVOCADO_TEST_OUTPUTDIR/patches.tar.bz2
+	rm -rf $AVOCADO_TEST_OUTPUTDIR/patches
+}
+
+_avocado_archive
+
+make -j `nproc` || exit 1
 
 ##### local boot  #####
 if [ $boot_proto == "local" ]; then
@@ -196,7 +214,7 @@ if [ $boot_proto == "local" ]; then
 	fi
 
 	if [ $kreboot == "y" ]; then
-	    SSH root@$host "kreboot  /boot/vmlinuz-$krel -w 0"
+	    SSH root@$host "kreboot  /boot/vmlinuz-$krel -w 2"
 	fi
 
 
