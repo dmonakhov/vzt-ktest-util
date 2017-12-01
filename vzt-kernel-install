@@ -39,7 +39,10 @@ if [ ! $? -eq 0 ]; then
 fi
 function SSH
 {
-	ssh -oStrictHostKeyChecking=no -oBatchMode=yes $@
+	ssh -o LogLevel=error \
+		-oUserKnownHostsFile=/dev/null \
+		-oStrictHostKeyChecking=no \
+		-oBatchMode=yes $@
 	return $?
 }
 
@@ -160,10 +163,12 @@ function grub_setup
 	if [ $ret -ne 0 ] ;then
 		echo "Error while grub setup"
 	else
-		echo "savedefault --default=0 --once" | \
+		if [ $kreboot == "n" ]; then
+			echo "savedefault --default=0 --once" | \
 				ssh root@$host "grub --batch > /dev/null"
-		SSH root@$host " wall 'grub: ${kernel_img} --once'"
-		SSH root@$host " echo 'grub: ${kernel_img} --once'  > /dev/kmsg"
+			SSH root@$host " wall 'grub: ${kernel_img} --once'"
+			SSH root@$host " echo 'grub: ${kernel_img} --once'  > /dev/kmsg"
+		fi
 		echo "grub setup OK"
 	fi
 	return $ret
