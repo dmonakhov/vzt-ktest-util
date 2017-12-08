@@ -183,9 +183,12 @@ function _avocado_archive()
 		return
 	fi
 	cat .config | lbzip2  > $AVOCADO_TEST_OUTPUTDIR/kconfig.bz2
-	guilt export $AVOCADO_TEST_OUTPUTDIR/patches
-	git diff > $AVOCADO_TEST_OUTPUTDIR/patches/9999-uncommitted.diff
+	guilt export -c  $AVOCADO_TEST_OUTPUTDIR/patches
 	tar c -C $AVOCADO_TEST_OUTPUTDIR patches | lbzip2 > $AVOCADO_TEST_OUTPUTDIR/patches.tar.bz2
+	for i in `ls $AVOCADO_TEST_OUTPUTDIR/patches` ;do
+		sum=`sha1sum $AVOCADO_TEST_OUTPUTDIR/patches/$i` ;
+		echo ${sum:0:7} $i >> $AVOCADO_TEST_OUTPUTDIR/series.txt
+	done
 	rm -rf $AVOCADO_TEST_OUTPUTDIR/patches
 }
 
