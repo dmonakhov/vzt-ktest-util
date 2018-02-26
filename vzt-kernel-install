@@ -183,17 +183,19 @@ function _avocado_archive()
 		return
 	fi
 	cat .config | lbzip2  > $AVOCADO_TEST_OUTPUTDIR/kconfig.bz2
-	guilt export -c  $AVOCADO_TEST_OUTPUTDIR/patches
-	tar c -C $AVOCADO_TEST_OUTPUTDIR patches | lbzip2 > $AVOCADO_TEST_OUTPUTDIR/patches.tar.bz2
-	for i in `ls $AVOCADO_TEST_OUTPUTDIR/patches` ;do
+	guilt=`which guilt`
+	if [ -n $"guilt" ]; then
+	    guilt export -c  $AVOCADO_TEST_OUTPUTDIR/patches
+	    tar c -C $AVOCADO_TEST_OUTPUTDIR patches | lbzip2 > $AVOCADO_TEST_OUTPUTDIR/patches.tar.bz2
+	    for i in `ls $AVOCADO_TEST_OUTPUTDIR/patches` ;do
 		sum=`sha1sum $AVOCADO_TEST_OUTPUTDIR/patches/$i` ;
 		echo ${sum:0:7} $i >> $AVOCADO_TEST_OUTPUTDIR/series.txt
-	done
-	rm -rf $AVOCADO_TEST_OUTPUTDIR/patches
+	    done
+	    rm -rf $AVOCADO_TEST_OUTPUTDIR/patches
+	fi
 }
 
 _avocado_archive
-
 make -j `nproc` || exit 1
 
 ##### local boot  #####
@@ -222,6 +224,13 @@ if [ $boot_proto == "local" ]; then
 	fi
 
 	if [ $kreboot == "y" ]; then
+	    URL="http://autotest.qa.sw.ru/pub/kexec-reboot-master.tar.gz"
+	    SSH root@$host 'which kreboot' || install_kreboot=t
+	    if [ -n "$install_kreboot" ];
+	    then
+		SSH root@$host 'curl $URL | tar zx -C /tmp/'
+		SSH root@$host 'make -C /tmp/kexec-reboot-master'
+	    fi
 	    SSH root@$host "kreboot  /boot/vmlinuz-$krel -w 2"
 	fi
 
